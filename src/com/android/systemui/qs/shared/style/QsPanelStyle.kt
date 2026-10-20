@@ -25,7 +25,13 @@ enum class QsPanelStyle(val value: Int) {
 
     Harmony(3),
 
-    OneUi(4);
+    OneUi(4),
+
+    Stock(5);
+
+    /** Uses AOSP's own tiles and Quick Settings content rather than a Penguin layout. */
+    val stockLayout: Boolean
+        get() = this == Default || this == Stock
 
     companion object {
         const val SETTING_NAME = "qs_panel_style"

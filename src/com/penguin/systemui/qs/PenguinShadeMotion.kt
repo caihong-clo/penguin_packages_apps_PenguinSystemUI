@@ -27,7 +27,7 @@ class PenguinShadeMotion @Inject constructor() : ShadeMotion {
 
     @Composable
     override fun key(): Any? {
-        defaultQsStyle = effectiveQsPanelStyle() == QsPanelStyle.Default
+        defaultQsStyle = effectiveQsPanelStyle().stockLayout
         return defaultQsStyle
     }
 
