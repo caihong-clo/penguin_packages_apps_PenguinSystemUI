@@ -43,6 +43,7 @@ import androidx.compose.material3.Icon as M3Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
@@ -115,6 +116,10 @@ fun LockscreenMediaCard(
         }
     val cards = viewModel.cards
     if (cards.isEmpty()) return
+    DisposableEffect(Unit) {
+        LockscreenMediaExpansion.cardShown = true
+        onDispose { LockscreenMediaExpansion.cardShown = false }
+    }
     val pagerState = rememberPagerState(pageCount = { cards.size })
     LaunchedEffect(pagerState, cards.size) {
         snapshotFlow { pagerState.settledPage }
