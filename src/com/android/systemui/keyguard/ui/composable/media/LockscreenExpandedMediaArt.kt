@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import com.android.systemui.penguin.DepthSubject
 import java.io.File
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 
 private val CoveredBlur = 40.dp
@@ -98,20 +99,31 @@ fun LockscreenExpandedMediaArt(
     LaunchedEffect(Unit) { snapshotFlow { alpha() }.collect { state.lockscreenAlpha = it } }
 
     val context = LocalContext.current
-    var tallArt by remember { mutableStateOf<File?>(null) }
-    var squareArt by remember { mutableStateOf<File?>(null) }
-    var tallRendering by remember { mutableStateOf(false) }
+    var tallArt by remember(state.track) { mutableStateOf<File?>(null) }
+    var squareArt by remember(state.track) { mutableStateOf<File?>(null) }
+    var tallRendering by remember(state.track) { mutableStateOf(false) }
+    var tallFailed by remember(state.track) { mutableStateOf(false) }
     val track = state.track
-    LaunchedEffect(state.enabled, state.motionArtEnabled, track) {
-        tallArt = null
-        squareArt = null
-        tallRendering = false
-        if (state.enabled && state.motionArtEnabled && track != null) {
-            val (artist, title) = track
-            tallArt = MotionArt.find(context, artist, title, MotionArt.Kind.TALL)
-            if (tallArt == null) {
-                squareArt = MotionArt.find(context, artist, title, MotionArt.Kind.SQUARE)
-            }
+    val lookupVisible = state.target && alpha() > 0f
+    LaunchedEffect(state.enabled, state.motionArtEnabled, track, lookupVisible, tallFailed) {
+        if (!state.enabled || !state.motionArtEnabled || track == null) {
+            tallArt = null
+            squareArt = null
+            tallRendering = false
+            return@LaunchedEffect
+        }
+        if (!lookupVisible) return@LaunchedEffect
+        val (artist, title) = track
+        // Retry transient failures while visible, and on the next lockscreen visit.
+        repeat(3) { attempt ->
+            val tall = if (tallFailed) null else MotionArt.find(context, artist, title, MotionArt.Kind.TALL)
+            val square = if (tall == null) {
+                MotionArt.find(context, artist, title, MotionArt.Kind.SQUARE)
+            } else null
+            tallArt = tall
+            squareArt = square
+            if (tall != null || square != null) return@LaunchedEffect
+            if (attempt < 2) delay(15_000L * (attempt + 1))
         }
     }
     val coverAlpha by animateFloatAsState(if (tallRendering) 0f else 1f, label = "cover")
@@ -163,6 +175,7 @@ fun LockscreenExpandedMediaArt(
                             )
                         },
                     crop = true,
+                    onError = { tallArt = null; tallRendering = false; tallFailed = true },
                 ) {
                     tallRendering = true
                 }
