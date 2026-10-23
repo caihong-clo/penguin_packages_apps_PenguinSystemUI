@@ -15,22 +15,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.android.systemui.qs.shared.style.glassBlurRegion
-import com.android.systemui.qs.shared.style.liquidGlassRim
 
 val CosAutoBrightnessTint = Color(0xFFFFC000)
 val CosVolumeTint = Color(0xFF2F6BFF)
@@ -45,26 +39,6 @@ fun Modifier.cosGlass(shape: Shape, active: Boolean = false): Modifier =
             shape,
             material = (if (active) 2 else 1) + if (isSystemInDarkTheme()) 0 else 2,
         )
-        .cosRim(shape, active)
-
-@Composable
-private fun Modifier.cosRim(shape: Shape, active: Boolean): Modifier {
-    val rim = remember { CosHooks.createRim() } ?: return liquidGlassRim(shape)
-    val dark = isSystemInDarkTheme()
-    return drawWithCache {
-        val radius = when (val outline = shape.createOutline(size, layoutDirection, this)) {
-            is Outline.Rounded -> outline.roundRect.topLeftCornerRadius.x
-            is Outline.Rectangle -> 0f
-            else -> size.minDimension / 2f
-        }
-        CosHooks.updateRim(rim, size.width, size.height, radius, active, dark)
-        val brush = ShaderBrush(rim)
-        onDrawWithContent {
-            drawContent()
-            drawRect(brush, blendMode = BlendMode.Plus)
-        }
-    }
-}
 
 @Composable
 fun CosGlassSlider(
