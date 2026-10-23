@@ -44,10 +44,14 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.ColorUtils
+import com.android.systemui.clocks.ClockStyle
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.keyguard.data.repository.InWindowLauncherUnlockAnimationRepository
 import com.android.systemui.penguin.LockscreenClockFace
 import com.android.systemui.qs.composefragment.CosHooks
+import com.android.systemui.shared.clocks.ClockRegistry
+import com.android.systemui.shared.clocks.DEFAULT_CLOCK_ID
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -95,8 +99,16 @@ data class FluidClockPose(val left: Float, val top: Float, val textSize: Float, 
 }
 
 @SysUISingleton
-class CosFluidClockFace @Inject constructor(@Application context: Context) : LockscreenClockFace {
+class CosFluidClockFace
+@Inject
+constructor(
+    @Application context: Context,
+    private val clockRegistry: ClockRegistry,
+    private val launcherState: InWindowLauncherUnlockAnimationRepository,
+) : LockscreenClockFace {
     private var settingOn by mutableStateOf(false)
+    private var defaultFace by mutableStateOf(true)
+    private var customStyle by mutableStateOf(0)
     private var handedOff by mutableStateOf(false)
     private val regions = mutableStateMapOf<Boolean, ComposeRect>()
     private var screenOffset = Offset.Zero
@@ -105,19 +117,36 @@ class CosFluidClockFace @Inject constructor(@Application context: Context) : Loc
 
     init {
         val resolver = context.contentResolver
-        val read = { settingOn = Settings.Secure.getInt(resolver, CosHooks.SETTING, 0) == 1 }
+        val read = {
+            settingOn = Settings.Secure.getInt(resolver, CosHooks.SETTING, 0) == 1
+            customStyle = Settings.Secure.getInt(resolver, ClockStyle.CLOCK_STYLE_KEY, 0)
+        }
         read()
-        resolver.registerContentObserver(
-            Settings.Secure.getUriFor(CosHooks.SETTING),
-            false,
+        val observer =
             object : ContentObserver(Handler(Looper.getMainLooper())) {
                 override fun onChange(selfChange: Boolean) = read()
-            },
+            }
+        resolver.registerContentObserver(Settings.Secure.getUriFor(CosHooks.SETTING), false, observer)
+        resolver.registerContentObserver(
+            Settings.Secure.getUriFor(ClockStyle.CLOCK_STYLE_KEY),
+            false,
+            observer,
+        )
+        // COS draws the default face as its Fluid Clock; a custom or other face draws itself.
+        val face = { defaultFace = clockRegistry.currentClockId == DEFAULT_CLOCK_ID }
+        face()
+        clockRegistry.registerClockChangeListener(
+            object : ClockRegistry.ClockChangeListener {
+                override fun onCurrentClockChanged() = face()
+            }
         )
     }
 
+    override val cosUnlock: Boolean
+        get() = settingOn && CosHooks.available
+
     override val isEnabled: Boolean
-        get() = settingOn && CosHooks.available && FluidClockFont.available
+        get() = cosUnlock && defaultFace && customStyle == 0 && FluidClockFont.available
 
     @Composable
     override fun Placeholder(large: Boolean, modifier: Modifier) {
@@ -172,7 +201,7 @@ class CosFluidClockFace @Inject constructor(@Application context: Context) : Loc
             val p = unlocking().coerceIn(0f, 1f)
 
             val rest = restPose(region, large, time, digitPaint, density)
-            val home = homePose(size.width, size.height, time, digitPaint, density)
+            val home = landing() ?: homePose(size.width, size.height, time, digitPaint, density)
             val pose = rest.lerp(home, FOLLOW_HAND * p)
             val h = pose.height.roundToInt().coerceIn(1, 1000)
             digitPaint.typeface = FluidClockFont.at(h)
@@ -243,7 +272,18 @@ class CosFluidClockFace @Inject constructor(@Application context: Context) : Loc
             }
         }
 
-    /** Roughly where the launcher keeps it, for the stretch of the unlock the lockscreen draws. */
+    /** Where the launcher keeps the clock, as it last said. */
+    private fun landing(): FluidClockPose? {
+        val state = launcherState.launcherSmartspaceState.value ?: return null
+        if (!state.visibleOnScreen || state.boundsOnScreen.isEmpty) return null
+        val digits = state.boundsOnScreen
+        val height = digits.height().toFloat()
+        val size = digits.width() / DIGITS_EM
+        val fontHeight = ((height / size - 0.742f) / 0.003456f).coerceIn(1f, 1000f)
+        return FluidClockPose(digits.left - screenOffset.x, digits.top - screenOffset.y, size, fontHeight)
+    }
+
+    /** Roughly where the launcher keeps it, until it says. */
     private fun homePose(width: Float, height: Float, time: String, paint: Paint, density: Density) =
         with(density) {
             val size = HOME_SIZE.toPx()
