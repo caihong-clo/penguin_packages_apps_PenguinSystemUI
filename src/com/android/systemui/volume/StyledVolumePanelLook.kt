@@ -33,6 +33,7 @@ import com.android.app.tracing.coroutines.launchTraced
 import com.android.internal.graphics.drawable.BackgroundBlurDrawable
 import com.android.systemui.penguin.VolumePanelLook
 import com.android.systemui.penguin.VolumePanelLooks
+import com.android.systemui.volume.dialog.sliders.ui.CosVolumeSlim
 import com.android.systemui.volume.dialog.sliders.ui.VolumePanelSlider
 import com.penguin.systemui.R
 import javax.inject.Inject
@@ -245,6 +246,21 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
             }
         }
         host.addTouchableBounds(button)
+        if (isCos) {
+            val shift =
+                view.resources.getDimension(R.dimen.volume_panel_cos_slider_width) *
+                    (1f - COS_SLIM_WIDTH) * 0.5f * (if (isPanelOnLeft(view)) -1f else 1f)
+            CosVolumeSlim.slim
+                .onEach { slim ->
+                    button.animate()
+                        .scaleX(if (slim) 0f else 1f)
+                        .scaleY(if (slim) 0f else 1f)
+                        .translationX(if (slim) shift else 0f)
+                        .setDuration(if (slim) 450 else 600)
+                        .setInterpolator(Interpolators.EMPHASIZED_DECELERATE)
+                }
+                .launchInTraced("SVPL#cosSlim", this)
+        }
 
         val toggle = View.OnClickListener { host.toggleExpanded() }
         button.setOnClickListener(toggle)
@@ -440,3 +456,4 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
 }
 
 private const val COS_SLIDER_VERTICAL_BIAS = 0.25f
+private const val COS_SLIM_WIDTH = 0.16f

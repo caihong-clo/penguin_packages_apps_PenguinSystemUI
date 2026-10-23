@@ -60,6 +60,7 @@ import com.android.systemui.volume.ui.compose.slider.SliderIcon
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import com.penguin.systemui.R
 import androidx.compose.animation.core.animateFloatAsState
@@ -395,10 +396,15 @@ fun VolumePanelSlider(
                 0,
             ) == 1
         val width = dimensionResource(R.dimen.volume_panel_cos_slider_width)
-        val nudgeBy = width * ((1f - COS_VOLUME_SLIM_WIDTH) * 0.5f * 0.6f) * if (onLeft) -1f else 1f
+        val edgeShift = width * ((1f - COS_VOLUME_SLIM_WIDTH) * 0.5f) * if (onLeft) -1f else 1f
+        LaunchedEffect(slim) { CosVolumeSlim.slim.value = slim }
         val shift by
             animateDpAsState(
-                if (nudge) nudgeBy else 0.dp,
+                when {
+                    !slim -> 0.dp
+                    nudge -> edgeShift * 0.6f
+                    else -> edgeShift
+                },
                 spring(dampingRatio = 0.9f, stiffness = 320f),
                 label = "cosVolumeNudge",
             )
@@ -486,3 +492,8 @@ private const val COS_VOLUME_SLIM_WIDTH = 0.16f
 private const val COS_VOLUME_NUDGE_MS = 300L
 private const val COS_VOLUME_SESSION_MS = 3000L
 private const val COS_VOLUME_TOUCH_GRACE_MS = 1000L
+
+/** Whether the COS volume slider is thinned down by the volume keys. */
+object CosVolumeSlim {
+    val slim = MutableStateFlow(false)
+}
