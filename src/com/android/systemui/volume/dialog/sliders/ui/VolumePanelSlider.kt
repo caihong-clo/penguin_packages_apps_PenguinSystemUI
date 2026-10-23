@@ -52,6 +52,18 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
 import com.penguin.systemui.R
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import com.android.systemui.qs.composefragment.cosGlass
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -73,8 +85,20 @@ fun VolumePanelSlider(
     val isPillStyle = panelStyle != VolumePanelStyle.DEFAULT
     val isOneUi = panelStyle == VolumePanelStyle.ONE_UI
     val isMyUi = panelStyle == VolumePanelStyle.MYUI
+    val isCos = panelStyle == VolumePanelStyle.COLOR_OS
     val colors =
         when {
+            isCos ->
+                SliderDefaults.colors(
+                    activeTrackColor = Color.Transparent,
+                    inactiveTrackColor = Color.Transparent,
+                    activeTickColor = Color.Transparent,
+                    inactiveTickColor = Color.Transparent,
+                    disabledActiveTrackColor = Color.Transparent,
+                    disabledInactiveTrackColor = Color.Transparent,
+                    disabledActiveTickColor = Color.Transparent,
+                    disabledInactiveTickColor = Color.Transparent,
+                )
             isMyUi -> {
                 val active = colorResource(R.color.volume_panel_myui_track_active)
                 val inactive = colorResource(R.color.volume_panel_myui_track_inactive)
@@ -154,7 +178,7 @@ fun VolumePanelSlider(
     val trackOutline = colorResource(R.color.volume_panel_expandable_track_outline)
 
     val bottomIcon: (@Composable BoxScope.(iconsState: SliderIconsState) -> Unit)? =
-        if (isPillStyle && !isMyUi) {
+        if (isPillStyle && !isMyUi && !isCos) {
             val iconTint =
                 if (isOneUi) {
                     colorResource(R.color.volume_panel_oneui_icon)
@@ -240,7 +264,7 @@ fun VolumePanelSlider(
                     modifier =
                         if (isPillStyle) {
                             Modifier.clip(RoundedCornerShape(trackCornerSize))
-                                .thenIf(!isOneUi && !isMyUi) {
+                                .thenIf(!isOneUi && !isMyUi && !isCos) {
                                     Modifier.border(
                                         1.dp,
                                         trackOutline,
@@ -320,7 +344,41 @@ fun VolumePanelSlider(
         )
     }
 
-    if (isMyUi) {
+    if (isCos) {
+        val range = sliderStateModel.valueRange
+        val span = range.endInclusive - range.start
+        val fraction =
+            if (span <= 0f) 0f
+            else ((sliderStateModel.value - range.start) / span).coerceIn(0f, 1f)
+        val dragged by interactionSource.collectIsDraggedAsState()
+        val widen by
+            animateFloatAsState(
+                if (dragged) 1.16f else 1f,
+                spring(dampingRatio = 1f, stiffness = 987f),
+                label = "cosVolumeWiden",
+            )
+        val shape = RoundedCornerShape(50)
+        Box(
+            modifier
+                .width(dimensionResource(R.dimen.volume_panel_cos_slider_width))
+                .graphicsLayer { scaleX = widen }
+                .cosGlass(shape)
+        ) {
+            Box(
+                Modifier.align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(fraction)
+                    .background(Color(0xF7FFFFFF))
+            )
+            slider(Modifier.fillMaxSize())
+            val covered = dimensionResource(R.dimen.volume_panel_cos_slider_height) * fraction > 32.dp
+            Icon(
+                icon = sliderStateModel.icon,
+                tint = { if (covered) Color(0xB3000000) else Color(0xE6FFFFFF) },
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp).size(24.dp),
+            )
+        }
+    } else if (isMyUi) {
         val iconTint = colorResource(R.color.volume_panel_myui_icon)
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
             slider(Modifier.weight(1f))

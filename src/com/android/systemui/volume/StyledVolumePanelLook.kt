@@ -50,6 +50,8 @@ class StyledVolumePanelLooks @Inject constructor() : VolumePanelLooks {
 class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLook {
 
     private val isMyUi = style == VolumePanelStyle.MYUI
+    private val isCos = style == VolumePanelStyle.COLOR_OS
+    private val isColumn = style == VolumePanelStyle.EXPANDABLE || isCos
 
     override val streams: Set<Int> =
         setOf(
@@ -69,7 +71,7 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
     override val floatingSliderLayout: Int = SysR.layout.volume_dialog_slider
 
     override val ringerColors: VolumePanelLook.RingerColors? =
-        if (style == VolumePanelStyle.EXPANDABLE) {
+        if (isColumn) {
             VolumePanelLook.RingerColors(
                 icon = R.color.volume_panel_expandable_icon_on_inactive,
                 background = R.color.volume_panel_expandable_button_background,
@@ -100,7 +102,7 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
         }
 
     override fun bindSettingsButton(button: ImageButton): Boolean {
-        if (style == VolumePanelStyle.EXPANDABLE) {
+        if (isColumn) {
             button.setBackgroundResource(R.drawable.volume_panel_expandable_button_background)
             button.imageTintList =
                 ColorStateList.valueOf(
@@ -118,6 +120,14 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
         if (cardLayout != null) Intent(Settings.ACTION_SOUND_SETTINGS) else null
 
     override fun onFloatingSliderAdded(container: View) {
+        if (isCos) {
+            container.updateLayoutParams<ViewGroup.LayoutParams> {
+                width =
+                    container.context.resources.getDimensionPixelSize(
+                        R.dimen.volume_panel_cos_slider_frame_width
+                    )
+            }
+        }
         if (isMyUi) {
             container.updateLayoutParams<ViewGroup.LayoutParams> {
                 width =
@@ -193,7 +203,11 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
         host.mainSliderContainer.updateLayoutParams<ConstraintLayout.LayoutParams> {
             height =
                 view.context.resources.getDimensionPixelSize(
-                    R.dimen.volume_panel_expandable_slider_height
+                    if (isCos) {
+                        R.dimen.volume_panel_cos_slider_height
+                    } else {
+                        R.dimen.volume_panel_expandable_slider_height
+                    }
                 )
         }
         val floating = host.floatingSlidersContainer
@@ -212,7 +226,14 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
                 ?: addExpandButton(view)
                 ?: return
         button.visibility = View.VISIBLE
-        if (style == VolumePanelStyle.EXPANDABLE) {
+        if (isCos) {
+            button.setBackgroundResource(R.drawable.volume_panel_cos_more_background)
+            button.imageTintList = ColorStateList.valueOf(0xE6FFFFFF.toInt())
+            button.updateLayoutParams<ViewGroup.LayoutParams> {
+                width = view.resources.getDimensionPixelSize(R.dimen.volume_panel_cos_slider_width)
+                height = view.resources.getDimensionPixelSize(R.dimen.volume_panel_cos_more_height)
+            }
+        } else if (style == VolumePanelStyle.EXPANDABLE) {
             button.setBackgroundResource(R.drawable.volume_panel_expandable_button_background)
             button.imageTintList =
                 ColorStateList.valueOf(
@@ -245,6 +266,9 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
                     collapsedButton?.visibility = if (isExpanded) View.GONE else View.VISIBLE
                     return@onEach
                 }
+                if (isCos) {
+                    view.applyCosChrome(isExpanded)
+                }
                 if (style == VolumePanelStyle.ONE_UI) {
                     view.applyOneUiChrome(isExpanded)
                     collapsedButton?.visibility = if (isExpanded) View.GONE else View.VISIBLE
@@ -252,6 +276,7 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
                 button.setImageResource(
                     when {
                         style == VolumePanelStyle.ONE_UI -> SysR.drawable.ic_expand_less_rounded
+                        isCos -> R.drawable.ic_volume_panel_cos_more
                         isExpanded -> SysR.drawable.ic_chevron_right
                         else -> SysR.drawable.ic_chevron_left
                     }
@@ -277,6 +302,17 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
                 .inflate(R.layout.volume_dialog_expand_button, bottomSection, false) as ImageButton
         bottomSection.addView(button, 0)
         return button
+    }
+
+    private fun View.applyCosChrome(isExpanded: Boolean) {
+        findViewById<View>(SysR.id.volume_dialog_top_section_container)?.visibility =
+            if (isExpanded) View.VISIBLE else View.GONE
+        for (id in intArrayOf(SysR.id.odi_captions_icon, SysR.id.volume_dialog_settings)) {
+            findViewById<View>(id)?.apply {
+                alpha = if (isExpanded) 1f else 0f
+                isEnabled = isExpanded
+            }
+        }
     }
 
     private fun View.applyOneUiChrome(isExpanded: Boolean) {
