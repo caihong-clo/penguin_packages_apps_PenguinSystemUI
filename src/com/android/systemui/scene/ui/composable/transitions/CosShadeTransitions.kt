@@ -37,8 +37,6 @@ fun TransitionBuilder.cosFromQuickSettingsShadeTransition(durationScale: Double 
 
     translate(QuickSettingsShade.Elements.Panel, y = -CosPanelDrop)
     fractionRange(end = .5f) {
-        fade(QuickSettingsShade.Elements.Panel)
-        scaleDraw(QuickSettingsShade.Elements.Panel, scaleX = 0.8f, scaleY = 0.8f)
         fade(QuickSettingsShade.Elements.StatusBar)
         fade(QuickSettingsShade.Elements.Header)
     }

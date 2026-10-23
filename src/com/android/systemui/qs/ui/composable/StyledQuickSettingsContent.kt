@@ -16,6 +16,10 @@
 
 package com.android.systemui.qs.ui.composable
 
+import androidx.compose.animation.core.Animatable
+import com.android.systemui.penguin.CosFeature
+import com.android.systemui.penguin.rememberCosFeature
+import com.android.systemui.qs.shared.style.LocalGlassBlurAlpha
 import com.android.systemui.qs.shared.style.panelStyle
 import androidx.compose.foundation.layout.Arrangement.spacedBy
 import com.android.systemui.qs.composefragment.ColorOsGap
@@ -371,26 +375,44 @@ private fun ContentScope.ColorOsQuickSettingsContent(
             .collect { interactable = it >= .5f }
     }
 
-    Column(
-        verticalArrangement = spacedBy(ColorOsGap),
-        modifier =
-            modifier
-                .element(Elements.QuickSettingsContent)
-                .padding(horizontal = dimensionResource(id = R.dimen.qs_horizontal_margin))
-                .sysuiResTag("quick_settings_panel"),
+    val own = qsHostTransition()
+    val host = LocalQsHostTransition.current ?: own
+    val transition =
+        QsHostTransition(idle = host.idle && own.idle, leaving = host.leaving || own.leaving)
+    val cosHide = rememberCosFeature(CosFeature.Shade)
+    val glassFade = remember { Animatable(1f) }
+    LaunchedEffect(cosHide && transition.leaving) {
+        glassFade.animateTo(
+            if (cosHide && transition.leaving) 0f else 1f,
+            spring(dampingRatio = 1f, stiffness = 3948f),
+        )
+    }
+    val outerGlassAlpha = LocalGlassBlurAlpha.current
+    CompositionLocalProvider(
+        LocalQsHostTransition provides transition,
+        LocalGlassBlurAlpha provides { outerGlassAlpha() * glassFade.value },
     ) {
-        ColorOsHeader(viewModel, interactable)
-        Box(Modifier.element(Elements.QuickSettingsTiles)) {
-            GridAnchor()
-            ColorOsTileGrid(gridTiles)
-        }
-        if (contentKey != Overlays.QuickSettingsShade) {
-            val editButtonViewModel =
-                rememberViewModel(traceName = "ColorOsQuickSettings-editButton") {
-                    viewModel.editModeButtonViewModelFactory.create()
+        Column(
+            verticalArrangement = spacedBy(ColorOsGap),
+            modifier =
+                modifier
+                    .element(Elements.QuickSettingsContent)
+                    .padding(horizontal = dimensionResource(id = R.dimen.qs_horizontal_margin))
+                    .sysuiResTag("quick_settings_panel"),
+        ) {
+            ColorOsHeader(viewModel, interactable)
+            Box(Modifier.element(Elements.QuickSettingsTiles)) {
+                GridAnchor()
+                ColorOsTileGrid(gridTiles)
+            }
+            if (contentKey != Overlays.QuickSettingsShade) {
+                val editButtonViewModel =
+                    rememberViewModel(traceName = "ColorOsQuickSettings-editButton") {
+                        viewModel.editModeButtonViewModelFactory.create()
+                    }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    EditModeButton(viewModel = editButtonViewModel, isVisible = interactable)
                 }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                EditModeButton(viewModel = editButtonViewModel, isVisible = interactable)
             }
         }
     }
