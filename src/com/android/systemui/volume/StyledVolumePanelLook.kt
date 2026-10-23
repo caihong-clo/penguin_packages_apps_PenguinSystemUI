@@ -209,6 +209,7 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
                         R.dimen.volume_panel_expandable_slider_height
                     }
                 )
+            if (isCos) verticalBias = COS_SLIDER_VERTICAL_BIAS
         }
         val floating = host.floatingSlidersContainer
         (floating as? LinearLayout)?.showDividers = LinearLayout.SHOW_DIVIDER_NONE
@@ -437,3 +438,5 @@ class StyledVolumePanelLook(private val style: VolumePanelStyle) : VolumePanelLo
         Settings.Secure.getInt(view.context.contentResolver, Settings.Secure.VOLUME_PANEL_ON_LEFT, 0) ==
             1
 }
+
+private const val COS_SLIDER_VERTICAL_BIAS = 0.25f
