@@ -6,6 +6,7 @@
 package com.android.systemui.keyguard.ui.composable.media
 
 import android.graphics.Bitmap
+import java.io.File
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -45,7 +46,7 @@ private const val MASK_ALPHA = 0.4f
 private const val BAND_ALPHA = 0.6f
 
 @Composable
-internal fun CosImmersiveArt(artwork: CommonIcon, modifier: Modifier = Modifier) {
+internal fun CosImmersiveArt(artwork: CommonIcon, video: File?, modifier: Modifier = Modifier) {
     val maskColor by
         produceState(Color.Transparent, artwork) {
             value = withContext(Dispatchers.Default) { cosMaskColor(artwork) }
@@ -53,13 +54,13 @@ internal fun CosImmersiveArt(artwork: CommonIcon, modifier: Modifier = Modifier)
     BoxWithConstraints(modifier.fillMaxSize()) {
         val width = maxWidth
         val height = maxHeight
-        val base: @Composable (Modifier) -> Unit = { layer ->
+        val base: @Composable (Modifier, File?) -> Unit = { layer, motion ->
             Box(layer.fillMaxSize()) {
-                ArtStack(artwork, width, height * 0.2f)
+                ArtStack(artwork, motion, width, height * 0.2f)
                 Box(Modifier.fillMaxSize().background(maskColor.copy(alpha = MASK_ALPHA)))
             }
         }
-        base(Modifier)
+        base(Modifier, video)
         base(
             Modifier.graphicsLayer {
                     compositingStrategy = CompositingStrategy.Offscreen
@@ -71,7 +72,8 @@ internal fun CosImmersiveArt(artwork: CommonIcon, modifier: Modifier = Modifier)
                         blurMask(size.height, TopBand.toPx(), BottomBand.toPx()),
                         blendMode = BlendMode.DstIn,
                     )
-                }
+                },
+            null,
         )
         Box(
             Modifier.align(Alignment.TopCenter)
@@ -97,10 +99,13 @@ internal fun CosImmersiveArt(artwork: CommonIcon, modifier: Modifier = Modifier)
 }
 
 @Composable
-private fun ArtStack(artwork: CommonIcon, side: Dp, top: Dp) {
+private fun ArtStack(artwork: CommonIcon, video: File?, side: Dp, top: Dp) {
     Box(Modifier.fillMaxSize()) {
         Artwork(artwork, Modifier.offset(y = top - side).size(side).graphicsLayer { scaleY = -1f })
-        Artwork(artwork, Modifier.offset(y = top).size(side))
+        Box(Modifier.offset(y = top).size(side)) {
+            Artwork(artwork, Modifier.fillMaxSize())
+            video?.let { MotionArtVideo(it, Modifier.fillMaxSize(), crop = true) }
+        }
         Artwork(artwork, Modifier.offset(y = top + side).size(side).graphicsLayer { scaleY = -1f })
     }
 }

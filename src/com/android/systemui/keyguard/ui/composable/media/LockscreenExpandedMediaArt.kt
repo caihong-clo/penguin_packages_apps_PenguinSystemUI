@@ -101,20 +101,25 @@ fun LockscreenExpandedMediaArt(
     var squareArt by remember { mutableStateOf<File?>(null) }
     var tallRendering by remember { mutableStateOf(false) }
     val track = state.track
-    LaunchedEffect(state.enabled, state.motionArtEnabled, track) {
+    val cos = rememberCosExperience()
+    LaunchedEffect(state.enabled, state.motionArtEnabled, track, cos) {
         tallArt = null
         squareArt = null
         tallRendering = false
         if (state.enabled && state.motionArtEnabled && track != null) {
             val (artist, title) = track
-            tallArt = MotionArt.find(context, artist, title, MotionArt.Kind.TALL)
-            if (tallArt == null) {
+            if (cos) {
+                squareArt = MotionArt.find(context, artist, title, MotionArt.Kind.SQUARE)
+            }
+            if (squareArt == null) {
+                tallArt = MotionArt.find(context, artist, title, MotionArt.Kind.TALL)
+            }
+            if (tallArt == null && squareArt == null) {
                 squareArt = MotionArt.find(context, artist, title, MotionArt.Kind.SQUARE)
             }
         }
     }
     val coverAlpha by animateFloatAsState(if (tallRendering) 0f else 1f, label = "cover")
-    val cos = rememberCosExperience()
 
     var origin by remember { mutableStateOf(Offset.Zero) }
     var height by remember { mutableStateOf(0f) }
@@ -135,8 +140,12 @@ fun LockscreenExpandedMediaArt(
         val artwork = state.artwork
         if (f <= 0f || artwork == null) return@Box
         val density = LocalDensity.current
-        if (cos && tallArt == null) {
-            CosImmersiveArt(artwork, Modifier.fillMaxSize().graphicsLayer { this.alpha = f })
+        if (cos) {
+            CosImmersiveArt(
+                artwork,
+                squareArt ?: tallArt,
+                Modifier.fillMaxSize().graphicsLayer { this.alpha = f },
+            )
             return@Box
         }
 
