@@ -60,6 +60,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -197,6 +198,8 @@ private fun PenguinMediaCardContent(
     HorizontalPager(state = pagerState, pageSpacing = PageGap, modifier = modifier) { page ->
         val card = cards[page]
         val dots: @Composable () -> Unit = { PageDots(cards.size, pagerState.currentPage) }
+        val seekColor = rememberCosMediaColor((card.background as? CommonIcon.Loaded)?.drawable)
+        CompositionLocalProvider(LocalCosSeekColor provides seekColor) {
         when {
             expanded -> ExpandedMediaPlayer(card, dots)
             tall -> TallMediaCard(card, card.navigation, height ?: qsModuleHeight(6), dots)
@@ -205,6 +208,7 @@ private fun PenguinMediaCardContent(
             controlCentre ->
                 ControlCentreWideMediaCard(card, card.navigation, height ?: qsModuleHeight(2), dots)
             else -> WideMediaCard(card, card.navigation, Modifier, dots, height)
+        }
         }
     }
 }
@@ -225,6 +229,11 @@ private fun SquareMediaCard(
                 .height(moduleHeight)
                 .clip(RoundedCornerShape(ArtworkCorner))
                 .background(glassSurface())
+                .cosMediaLight(
+                    (card.background as? CommonIcon.Loaded)?.drawable,
+                    ArtworkCorner,
+                    with(LocalDensity.current) { Offset((14.dp + ArtSize / 2).toPx(), (14.dp + ArtSize / 2).toPx()) },
+                )
                 .glassRim(RoundedCornerShape(ArtworkCorner))
                 .padding(14.dp),
         verticalArrangement = Arrangement.SpaceBetween,
@@ -709,6 +718,7 @@ private fun ScrubBar(
             modifier =
                 barModifier
                     .height(if (compact) 16.dp else ScrubTouchHeight)
+                    .cosSeekGlow(showing.progress, showing.isSquiggly, touching || showing.isScrubbing)
                     .semantics { contentDescription = showing.contentDescription }
                     .thenIf(scrubbable) {
                         Modifier.pointerInput(Unit) {
