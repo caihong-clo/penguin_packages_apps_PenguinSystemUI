@@ -35,6 +35,7 @@ import com.android.compose.animation.scene.ContentScope
 import com.android.systemui.animation.Expandable
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.qs.composefragment.cosGlass
+import com.android.systemui.qs.composefragment.cosHeaderHide
 import com.android.systemui.qs.panels.ui.viewmodel.toolbar.ToolbarViewModel
 import com.android.systemui.qs.shared.style.QsPanelStyle
 import com.android.systemui.qs.shared.style.glassBlurRegion
@@ -78,8 +79,10 @@ fun ContentScope.ControlCentreTop(
         )
         return
     }
+    val leaving = LocalQsHostTransition.current?.leaving == true || qsHostTransition().leaving
     Column(
         Modifier.fillMaxWidth()
+            .cosHeaderHide(leaving)
             .padding(horizontal = PenguinGridMargin)
             .padding(top = 12.dp, bottom = 20.dp)
     ) {

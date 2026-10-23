@@ -5,6 +5,8 @@
 
 package com.android.systemui.qs.composefragment
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,6 +18,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import com.android.systemui.penguin.CosFeature
 import com.android.systemui.penguin.rememberCosFeature
 import com.android.systemui.qs.ui.composable.LocalQsHostTransition
+import kotlin.math.PI
+import kotlin.math.pow
 import kotlinx.coroutines.delay
 
 private const val STAGGER_MS = 16L
@@ -47,4 +51,17 @@ fun Modifier.cosModuleReveal(index: Int): Modifier {
         scaleY = scale
         this.alpha = alpha
     }
+}
+
+@Composable
+fun Modifier.cosHeaderHide(leaving: Boolean): Modifier {
+    if (!rememberCosFeature(CosFeature.Shade)) return this
+    val alpha = remember { Animatable(1f) }
+    LaunchedEffect(leaving) {
+        alpha.animateTo(
+            if (leaving) 0f else 1f,
+            spring(dampingRatio = 1f, stiffness = (2 * PI / HIDE_RESPONSE).pow(2).toFloat()),
+        )
+    }
+    return graphicsLayer { this.alpha = alpha.value }
 }
