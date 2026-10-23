@@ -64,13 +64,16 @@ fun Modifier.cosMediaLight(artwork: Drawable?, corner: Dp, artworkCenter: Offset
             return@LaunchedEffect
         }
         CosHooks.applyMediaLight(light, color, night)
-        if (measured != 0) {
-            CosHooks.applyMediaLightSpread(
-                light,
-                artworkCenter.x - light.bounds.width() / 2f,
-                artworkCenter.y - light.bounds.height() / 2f,
-            )
-        }
+    }
+
+    val ready = measured != 0 && color != 0
+    LaunchedEffect(artwork, ready) {
+        if (!ready) return@LaunchedEffect
+        CosHooks.applyMediaLightSpread(
+            light,
+            artworkCenter.x - light.bounds.width() / 2f,
+            artworkCenter.y - light.bounds.height() / 2f,
+        )
     }
 
     return onSizeChanged {

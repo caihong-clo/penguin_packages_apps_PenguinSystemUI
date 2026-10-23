@@ -221,20 +221,23 @@ private fun SquareMediaCard(
     height: Dp? = null,
 ) {
     val moduleHeight = height ?: qsModuleHeight(2)
+    val cos = rememberCosExperience()
 
     MediaCardContainer(card, RoundedCornerShape(ArtworkCorner)) {
     Column(
         modifier =
             Modifier.fillMaxWidth()
                 .height(moduleHeight)
-                .clip(RoundedCornerShape(ArtworkCorner))
-                .background(glassSurface())
+                .then(
+                    if (cos) Modifier.cosGlass(RoundedCornerShape(ArtworkCorner))
+                    else Modifier.clip(RoundedCornerShape(ArtworkCorner)).background(glassSurface())
+                )
                 .cosMediaLight(
                     (card.background as? CommonIcon.Loaded)?.drawable,
                     ArtworkCorner,
                     with(LocalDensity.current) { Offset((14.dp + ArtSize / 2).toPx(), (14.dp + ArtSize / 2).toPx()) },
                 )
-                .glassRim(RoundedCornerShape(ArtworkCorner))
+                .then(if (cos) Modifier else Modifier.glassRim(RoundedCornerShape(ArtworkCorner)))
                 .padding(14.dp),
         verticalArrangement = Arrangement.SpaceBetween,
     ) {
