@@ -16,6 +16,7 @@
 
 package com.android.systemui.keyguard.ui.composable.media
 
+import com.android.systemui.qs.composefragment.rememberCosExperience
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -113,6 +114,7 @@ fun LockscreenExpandedMediaArt(
         }
     }
     val coverAlpha by animateFloatAsState(if (tallRendering) 0f else 1f, label = "cover")
+    val cos = rememberCosExperience()
 
     var origin by remember { mutableStateOf(Offset.Zero) }
     var height by remember { mutableStateOf(0f) }
@@ -133,6 +135,10 @@ fun LockscreenExpandedMediaArt(
         val artwork = state.artwork
         if (f <= 0f || artwork == null) return@Box
         val density = LocalDensity.current
+        if (cos && tallArt == null) {
+            CosImmersiveArt(artwork, Modifier.fillMaxSize().graphicsLayer { this.alpha = f })
+            return@Box
+        }
 
         Box(Modifier.fillMaxSize().graphicsLayer { this.alpha = f }) {
             if (tallArt == null) {

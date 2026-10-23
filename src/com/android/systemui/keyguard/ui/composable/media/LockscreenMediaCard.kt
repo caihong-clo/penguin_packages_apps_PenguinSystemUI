@@ -16,6 +16,9 @@
 
 package com.android.systemui.keyguard.ui.composable.media
 
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.draw.drawBehind
+import com.android.systemui.qs.composefragment.rememberCosExperience
 import com.android.systemui.qs.composefragment.rememberCosMediaColor
 import com.android.systemui.qs.composefragment.LocalCosSeekColor
 import androidx.compose.runtime.CompositionLocalProvider
@@ -94,6 +97,10 @@ import com.android.systemui.qs.shared.style.liquidGlassEnabled
 import com.android.systemui.res.R
 
 private val CardCorner = 28.dp
+
+private val CosCardOverlay = Color(0x66999999)
+
+private val CosCardDodge = Color(0x4D737373)
 private val CardPadding = 18.dp
 private val ThumbnailSize = 64.dp
 private val ThumbnailCorner = 10.dp
@@ -153,6 +160,7 @@ private fun MediaCardBody(card: MediaCardViewModel, isSelected: Boolean) {
     val fraction = { LockscreenMediaExpansion.fraction }
     val f = fraction()
     val glass = liquidGlassEnabled()
+    val cos = rememberCosExperience()
     Expandable(
         controller = rememberExpandableController(color = Color.Transparent, shape = RoundedCornerShape(CardCorner)),
         useModifierBasedImplementation = true,
@@ -166,18 +174,29 @@ private fun MediaCardBody(card: MediaCardViewModel, isSelected: Boolean) {
                     else Modifier.border(1.dp, CardBorder, RoundedCornerShape(CardCorner))
                 )
         ) {
-        WallpaperBlur(
-            alpha = {
-                if (LockscreenMediaExpansion.fraction > 0f) 0f
-                else LockscreenMediaExpansion.lockscreenAlpha
-            },
-            corner = CardCorner,
-            modifier = Modifier.matchParentSize(),
-        )
+        val immersive = cos && f > 0f
+        if (immersive) {
+            Box(
+                Modifier.matchParentSize().drawBehind {
+                    drawRect(CosCardOverlay, blendMode = BlendMode.Overlay)
+                    drawRect(CosCardDodge, blendMode = BlendMode.ColorDodge)
+                }
+            )
+        } else {
+            WallpaperBlur(
+                alpha = {
+                    if (LockscreenMediaExpansion.fraction > 0f) 0f
+                    else LockscreenMediaExpansion.lockscreenAlpha
+                },
+                corner = CardCorner,
+                modifier = Modifier.matchParentSize(),
+            )
+        }
         Box(
             Modifier.matchParentSize()
                 .background(
-                    lerpColor(if (glass) LiquidGlassSurface else CompactGlass, SmokyGlass, f)
+                    if (immersive) Color.Transparent
+                    else lerpColor(if (glass) LiquidGlassSurface else CompactGlass, SmokyGlass, f)
                 )
                 .glassRim(RoundedCornerShape(CardCorner))
                 .cosStatusGlow(card.title to card.subtitle, CardCorner)
