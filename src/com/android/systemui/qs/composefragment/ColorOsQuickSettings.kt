@@ -94,9 +94,19 @@ fun colorOsCardSpecs(tiles: List<TileViewModel>): Set<String> {
     return buildSet {
         ColorOsWifiSpecs.firstOrNull { it in present }?.let(::add)
         if (ColorOsBluetoothSpec in present) add(ColorOsBluetoothSpec)
-        if (ColorOsSimSpec in present) add(ColorOsSimSpec)
+        colorOsThirdCardSpec(present)?.let(::add)
     }
 }
+
+/**
+ * The card beside the ringer: mobile data, or on a device without it (a Wi-Fi tablet) the first
+ * of a few tiles that read well as a card, so the slot is not left empty.
+ */
+private fun colorOsThirdCardSpec(present: Set<String>): String? =
+    if (ColorOsSimSpec in present) ColorOsSimSpec
+    else ColorOsFallbackCardSpecs.firstOrNull { it in present }
+
+private val ColorOsFallbackCardSpecs = listOf("dnd", "dark", "rotation", "hotspot", "cast", "airplane")
 
 private fun colorOsActiveTint(spec: String): Color =
     when (spec) {
@@ -126,7 +136,7 @@ fun ColorOsTopRows(
     val bySpec = remember(tiles) { tiles.associateBy { it.spec.spec } }
     val wifi = ColorOsWifiSpecs.firstNotNullOfOrNull { bySpec[it] }
     val bluetooth = bySpec[ColorOsBluetoothSpec]
-    val sim = bySpec[ColorOsSimSpec]
+    val sim = colorOsThirdCardSpec(bySpec.keys)?.let { bySpec[it] }
     ColorOsListen(listOfNotNull(wifi, bluetooth, sim))
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val half = (maxWidth - ColorOsGap) / 2
