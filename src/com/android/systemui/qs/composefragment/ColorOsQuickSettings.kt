@@ -11,6 +11,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
 import android.service.quicksettings.Tile
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -50,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -67,6 +72,9 @@ import com.android.systemui.qs.panels.ui.compose.TileListener
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.SmallTileContent
 import com.android.systemui.qs.panels.ui.viewmodel.TileViewModel
 import com.android.systemui.res.R
+import com.penguin.systemui.R as PenguinR
+import com.android.systemui.shade.ui.composable.CosTileTips
+import com.android.systemui.shade.ui.composable.cosSwitchRow
 
 internal val ColorOsGap = 18.dp
 private val ColorOsPillHeight = 68.dp
@@ -149,17 +157,17 @@ fun ColorOsTopRows(
             (fit * ColorOsSliderAspect).coerceIn(ColorOsModuleHeight, ColorOsMaxModuleHeight)
         val sliderWidth = minOf(fit, moduleHeight / ColorOsSliderAspect)
         Column(verticalArrangement = spacedBy(ColorOsGap)) {
-            Row(Modifier.cosModuleReveal(1).fillMaxWidth().height(ColorOsPillHeight), spacedBy(ColorOsGap)) {
+            Row(Modifier.cosModuleReveal(1).cosSwitchRow().fillMaxWidth().height(ColorOsPillHeight), spacedBy(ColorOsGap)) {
                 Box(Modifier.weight(1f).fillMaxHeight()) { wifi?.let { ColorOsConnectionPill(it) } }
                 Box(Modifier.weight(1f).fillMaxHeight()) {
                     bluetooth?.let { ColorOsConnectionPill(it) }
                 }
             }
-            Row(Modifier.cosModuleReveal(2).fillMaxWidth().height(moduleHeight), spacedBy(ColorOsGap)) {
+            Row(Modifier.cosModuleReveal(2).cosSwitchRow().fillMaxWidth().height(moduleHeight), spacedBy(ColorOsGap)) {
                 Box(Modifier.weight(1f).fillMaxHeight()) { media?.invoke() ?: ColorOsIdleMedia() }
                 Box(Modifier.weight(1f).fillMaxHeight()) { sliders(sliderWidth, moduleHeight) }
             }
-            Row(Modifier.cosModuleReveal(3).fillMaxWidth().height(ColorOsPillHeight), spacedBy(ColorOsGap)) {
+            Row(Modifier.cosModuleReveal(3).cosSwitchRow().fillMaxWidth().height(ColorOsPillHeight), spacedBy(ColorOsGap)) {
                 ColorOsRingerPill(Modifier.weight(1f).fillMaxHeight())
                 Box(Modifier.weight(1f).fillMaxHeight()) { sim?.let { ColorOsConnectionPill(it) } }
             }
@@ -183,7 +191,7 @@ private fun ColorOsConnectionPill(tile: TileViewModel) {
         horizontalArrangement = spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ColorOsCircle(icon, active, 46.dp, colorOsActiveTint(tile.spec.spec))
+        ColorOsCircle(icon, active, 46.dp, colorOsActiveTint(tile.spec.spec), tile.spec.spec)
         Column(Modifier.weight(1f)) {
             Text(
                 text = uiState.label,
@@ -207,21 +215,31 @@ private fun ColorOsConnectionPill(tile: TileViewModel) {
 }
 
 @Composable
-private fun ColorOsCircle(icon: Icon, active: Boolean, size: Dp, activeTint: Color) {
+private fun ColorOsCircle(
+    icon: Icon,
+    active: Boolean,
+    size: Dp,
+    activeTint: Color,
+    spec: String? = null,
+) {
+    // ColorOS fills the circle and recolours the icon over 200 ms.
+    val fill by animateFloatAsState(if (active) 1f else 0f, tween(200, easing = ColorOsEase))
+    val iconColor by
+        animateColorAsState(if (active) activeTint else Color.White, tween(200, easing = ColorOsEase))
     Box(
         modifier =
-            Modifier.size(size)
-                .cosGlass(CircleShape, active)
-                .then(if (active) Modifier.background(ColorOsActiveFill, CircleShape) else Modifier),
+            Modifier.size(size).cosGlass(CircleShape, active).drawBehind {
+                if (fill > 0f) drawCircle(ColorOsActiveFill, alpha = fill)
+            },
         contentAlignment = Alignment.Center,
     ) {
-        SmallTileContent(
-            iconProvider = { icon },
-            color = if (active) activeTint else Color.White,
-            size = { size * 0.42f },
-        )
+        if (!cosTileLottie(spec, active, Color.White, activeTint, size * 0.42f)) {
+            SmallTileContent(iconProvider = { icon }, color = iconColor, size = { size * 0.42f })
+        }
     }
 }
+
+private val ColorOsEase = CubicBezierEasing(0.33f, 0f, 0.67f, 1f)
 
 @Composable
 private fun ColorOsVectorCircle(
@@ -341,7 +359,7 @@ fun ColorOsTileGrid(tiles: List<TileViewModel>, modifier: Modifier = Modifier) {
         ) { page ->
             Column(Modifier.fillMaxWidth()) {
                 pages[page].chunked(ColorOsColumns).forEach { row ->
-                    Row(Modifier.fillMaxWidth().height(ColorOsTileRowHeight)) {
+                    Row(Modifier.cosSwitchRow().fillMaxWidth().height(ColorOsTileRowHeight)) {
                         row.forEach { ColorOsTile(it, Modifier.weight(1f)) }
                         repeat(ColorOsColumns - row.size) { Spacer(Modifier.weight(1f)) }
                     }
@@ -368,6 +386,7 @@ fun ColorOsTileGrid(tiles: List<TileViewModel>, modifier: Modifier = Modifier) {
 @Composable
 private fun ColorOsTile(tile: TileViewModel, modifier: Modifier = Modifier) {
     val (uiState, icon) = rememberTileState(tile)
+    val context = LocalContext.current
     val active = uiState.visualState == Tile.STATE_ACTIVE
     val unavailable = uiState.visualState == Tile.STATE_UNAVAILABLE
     Column(
@@ -376,12 +395,23 @@ private fun ColorOsTile(tile: TileViewModel, modifier: Modifier = Modifier) {
                 .fillMaxHeight()
                 .alpha(if (unavailable) 0.45f else 1f)
                 .combinedClickable(
-                    onClick = { tile.primaryAction(uiState) },
+                    onClick = {
+                        if (!unavailable) {
+                            CosTileTips.show(
+                                context.getString(
+                                    if (active) PenguinR.string.cos_tile_tip_off
+                                    else PenguinR.string.cos_tile_tip_on,
+                                    uiState.label,
+                                )
+                            )
+                        }
+                        tile.primaryAction(uiState)
+                    },
                     onLongClick = { tile.settingsClick(null) },
                 ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ColorOsCircle(icon, active, ColorOsTileSize, colorOsActiveTint(tile.spec.spec))
+        ColorOsCircle(icon, active, ColorOsTileSize, colorOsActiveTint(tile.spec.spec), tile.spec.spec)
         Text(
             text = uiState.label,
             color = ColorOsLabel,
