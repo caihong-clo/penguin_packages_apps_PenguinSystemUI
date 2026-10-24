@@ -32,6 +32,7 @@ import com.android.systemui.penguin.rememberCosFeature
 import com.google.ux.material.libmonet.hct.Hct
 import com.google.ux.material.libmonet.scheme.SchemeContent
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -57,7 +58,8 @@ fun Modifier.cosMediaLight(artwork: Drawable?, corner: Dp, artworkCenter: Offset
         onDispose { light.callback = null }
     }
 
-    val color = rememberCosMediaColor(artwork)
+    val art = rememberCosMediaArt(artwork)
+    val color = art.color
 
     var measured by remember { mutableIntStateOf(0) }
     LaunchedEffect(color, night, measured) {
@@ -69,7 +71,7 @@ fun Modifier.cosMediaLight(artwork: Drawable?, corner: Dp, artworkCenter: Offset
     }
 
     val ready = measured != 0 && color != 0
-    LaunchedEffect(artwork, ready) {
+    LaunchedEffect(art.signature, ready) {
         if (!ready) return@LaunchedEffect
         CosHooks.applyMediaLightSpread(
             light,
@@ -91,17 +93,49 @@ fun Modifier.cosMediaLight(artwork: Drawable?, corner: Dp, artworkCenter: Offset
 }
 
 @Composable
-fun rememberCosMediaColor(artwork: Drawable?): Int {
+fun rememberCosMediaColor(artwork: Drawable?): Int = rememberCosMediaArt(artwork).color
+
+/**
+ * The light colour for [artwork] and a signature of what it shows. Media updates hand over a new
+ * drawable for the same picture several times per track, so effects key on the signature.
+ */
+data class CosMediaArt(val color: Int, val signature: Int)
+
+@Composable
+fun rememberCosMediaArt(artwork: Drawable?): CosMediaArt {
     val night = isSystemInDarkTheme()
-    val color by
-        produceState(0, artwork, night) {
-            value = withContext(Dispatchers.Default) { artwork?.let { cosMediaColor(it, night) } ?: 0 }
+    val art by
+        produceState(CosMediaArt(0, 0), artwork, night) {
+            val next =
+                if (artwork == null) {
+                    delay(ART_GONE_DELAY_MS)
+                    CosMediaArt(0, 0)
+                } else {
+                    withContext(Dispatchers.Default) { cosMediaArt(artwork, night) }
+                }
+            if (next != value) value = next
         }
-    return color
+    return art
 }
 
-private fun cosMediaColor(artwork: Drawable, night: Boolean): Int {
+private const val ART_GONE_DELAY_MS = 600L
+
+private fun cosMediaArt(artwork: Drawable, night: Boolean): CosMediaArt {
     val bitmap: Bitmap = artwork.toBitmap(96, 96, Bitmap.Config.ARGB_8888)
     val seed = WallpaperColors.fromBitmap(bitmap).primaryColor.toArgb()
-    return SchemeContent(Hct.fromInt(seed), night, 0.0).primaryPalette.tone(80)
+    val color = SchemeContent(Hct.fromInt(seed), night, 0.0).primaryPalette.tone(80)
+    return CosMediaArt(color, signatureOf(bitmap))
+}
+
+/** A hash of an 8x8 sampling of [bitmap] at 4 bits per channel, stable across re-decodes. */
+private fun signatureOf(bitmap: Bitmap): Int {
+    var hash = 17
+    val step = bitmap.width / 8
+    for (y in 0 until 8) {
+        for (x in 0 until 8) {
+            val pixel = bitmap.getPixel(x * step + step / 2, y * step + step / 2)
+            hash = hash * 31 + ((pixel ushr 4) and 0x0F0F0F)
+        }
+    }
+    return hash
 }
