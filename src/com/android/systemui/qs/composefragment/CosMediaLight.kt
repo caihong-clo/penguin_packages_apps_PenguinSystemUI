@@ -44,17 +44,20 @@ fun Modifier.cosMediaLight(artwork: Drawable?, corner: Dp, artworkCenter: Offset
     val density = LocalDensity.current
     var frame by remember { mutableIntStateOf(0) }
 
-    DisposableEffect(light) {
-        light.callback =
-            object : Drawable.Callback {
-                override fun invalidateDrawable(who: Drawable) {
-                    frame++
-                }
-
-                override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {}
-
-                override fun unscheduleDrawable(who: Drawable, what: Runnable) {}
+    // Drawable keeps only a weak reference to its callback, so it is held here.
+    val callback = remember {
+        object : Drawable.Callback {
+            override fun invalidateDrawable(who: Drawable) {
+                frame++
             }
+
+            override fun scheduleDrawable(who: Drawable, what: Runnable, `when`: Long) {}
+
+            override fun unscheduleDrawable(who: Drawable, what: Runnable) {}
+        }
+    }
+    DisposableEffect(light) {
+        light.callback = callback
         onDispose { light.callback = null }
     }
 
