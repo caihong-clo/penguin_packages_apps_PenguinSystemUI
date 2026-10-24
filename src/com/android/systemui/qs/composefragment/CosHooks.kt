@@ -9,6 +9,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.RuntimeShader
 import android.graphics.drawable.Drawable
+import android.util.Log
 import androidx.dynamicanimation.animation.FloatValueHolder
 import androidx.dynamicanimation.animation.SpringAnimation
 import androidx.dynamicanimation.animation.SpringForce
@@ -21,8 +22,14 @@ import kotlin.math.pow
 
 /** Entry points to the COS experience's lights, rims and springs. */
 object CosHooks {
+    private const val TAG = "CosHooks"
+
+    /** A light whose shader fails to compile is left out rather than taking SystemUI down. */
+    private inline fun <T> build(what: String, create: () -> T): T? =
+        runCatching(create).onFailure { Log.e(TAG, "Could not create the $what", it) }.getOrNull()
+
     @Suppress("UNUSED_PARAMETER")
-    fun createMediaLight(context: Context): Drawable = CardLight()
+    fun createMediaLight(context: Context): Drawable? = build("media light") { CardLight() }
 
     fun setMediaLightCorner(light: Drawable, radius: Float) =
         (light as CardLight).setCornerRadius(radius)
@@ -40,12 +47,11 @@ object CosHooks {
 
         fun setProgress(progress: Float) = sweep.setProgress(progress)
 
-        /** A [weight] below 2 rounds the ends fully, like a capsule. */
-        fun draw(canvas: Canvas, width: Int, height: Int, cornerRadius: Float, weight: Float) =
-            sweep.draw(canvas, width, height, cornerRadius, capsule = weight < 2f)
+        fun draw(canvas: Canvas, width: Int, height: Int, cornerRadius: Float, capsule: Boolean) =
+            sweep.draw(canvas, width, height, cornerRadius, capsule)
     }
 
-    fun newStrokeGlow(): StrokeGlow? = runCatching { StrokeGlow(EdgeSweep()) }.getOrNull()
+    fun newStrokeGlow(): StrokeGlow? = build("edge sweep") { StrokeGlow(EdgeSweep()) }
 
     class ConicLight internal constructor(private val light: SeekLight) {
         fun setColor(color: Int) = light.setColor(color)
@@ -70,9 +76,9 @@ object CosHooks {
         ) = light.draw(canvas, progressStart, centerY, length, fraction, rtl)
     }
 
-    fun newConicLight(): ConicLight? = runCatching { ConicLight(SeekLight()) }.getOrNull()
+    fun newConicLight(): ConicLight? = build("seek light") { ConicLight(SeekLight()) }
 
-    fun createRim(): RuntimeShader? = runCatching { GlassRim.create() }.getOrNull()
+    fun createRim(): RuntimeShader? = build("glass rim") { GlassRim.create() }
 
     fun updateRim(
         shader: RuntimeShader,
