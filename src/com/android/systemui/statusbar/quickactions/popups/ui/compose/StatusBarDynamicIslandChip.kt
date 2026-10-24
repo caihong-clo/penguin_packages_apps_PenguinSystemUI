@@ -262,6 +262,17 @@ fun StatusBarDynamicIslandChip(
                 CosCapsuleArtwork(cosArtwork, cosMedia.artworkIcon, CosIsland.IconSize)
                 return@forEachIndexed
             }
+            val media = viewModel.popupContent as? PopupContentModel.Media
+            if (!cos && isArtworkLike && media != null) {
+                MediaArtFlip(track = media.model.songName?.toString(), artwork = chipIcon.icon) { icon ->
+                    Icon(
+                        icon = icon,
+                        modifier = Modifier.size(18.dp).clip(CircleShape),
+                        tint = Color.Unspecified,
+                    )
+                }
+                return@forEachIndexed
+            }
             Icon(
                 icon = chipIcon.icon,
                 modifier = Modifier
