@@ -16,6 +16,8 @@
 
 package com.android.systemui.statusbar.quickactions.dynamicisland.media.ui.compose
 
+import com.android.systemui.penguin.CosFeature
+import com.android.systemui.penguin.rememberCosFeature
 import com.android.systemui.qs.composefragment.cosSeekGlow
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
@@ -88,6 +90,10 @@ fun MediaControlPopup(
     useWaveform: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    if (rememberCosFeature(CosFeature.Island)) {
+        CosMediaCard(model, modifier)
+        return
+    }
     val artworkDrawable =
         remember(model.artworkIcon) { (model.artworkIcon as? UiIcon.Loaded)?.drawable }
     val accent = rememberAlbumArtAccent(artworkDrawable, fallback = MaterialTheme.colorScheme.primary)
