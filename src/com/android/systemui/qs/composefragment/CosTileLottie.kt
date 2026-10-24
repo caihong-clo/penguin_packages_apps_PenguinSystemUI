@@ -5,6 +5,7 @@
 
 package com.android.systemui.qs.composefragment
 
+import android.content.Context
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -17,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import com.airbnb.lottie.LottieComposition
@@ -25,17 +27,13 @@ import com.airbnb.lottie.LottieProperty
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.rememberLottieDynamicProperties
 import com.airbnb.lottie.compose.rememberLottieDynamicProperty
-import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * ColorOS draws its tile icons as Lottie animations that play when a tile turns on or off. Builds
- * that ship them put them in [DIR]; without them tiles keep their own icons.
- */
+/** ColorOS draws its tile icons as Lottie animations that play when a tile turns on or off. */
 internal object CosTileLottie {
-    private const val DIR = "/system_ext/etc/cos/qs"
+    private const val DIR = "cos/qs"
 
     private val compositions = ConcurrentHashMap<String, Result<LottieComposition>>()
 
@@ -63,14 +61,15 @@ internal object CosTileLottie {
      * The animation a tile plays on turning on ([on]) or off. Turning off has none for some tiles;
      * the start of their turning-on animation is how they look while off.
      */
-    suspend fun composition(spec: String, on: Boolean): LottieComposition? {
+    suspend fun composition(context: Context, spec: String, on: Boolean): LottieComposition? {
         val prefix = prefix(spec) ?: return null
         val name = "${prefix}_${if (on) "active" else "inactive"}_sep_dual_light.json"
         return compositions
             .getOrPut(name) {
                 withContext(Dispatchers.IO) {
                     runCatching {
-                        val json = File(DIR, name).readText()
+                        val json =
+                            context.assets.open("$DIR/$name").bufferedReader().use { it.readText() }
                         LottieCompositionFactory.fromJsonStringSync(json, name).value!!
                     }
                 }
@@ -93,18 +92,19 @@ internal fun cosTileLottie(
     size: Dp,
 ): Boolean {
     if (spec == null) return false
+    val context = LocalContext.current
     var shown by remember(spec) { mutableStateOf<LottieComposition?>(null) }
     var from by remember(spec) { mutableStateOf(active) }
     var playing by remember(spec) { mutableStateOf(false) }
     val progress = remember(spec) { Animatable(1f) }
     LaunchedEffect(spec, active) {
-        val forward = CosTileLottie.composition(spec, true) ?: run {
+        val forward = CosTileLottie.composition(context, spec, true) ?: run {
             shown = null
             return@LaunchedEffect
         }
         val changed = from != active
         from = active
-        val turn = if (active) forward else CosTileLottie.composition(spec, false)
+        val turn = if (active) forward else CosTileLottie.composition(context, spec, false)
         if (changed && turn != null) {
             shown = turn
             playing = true

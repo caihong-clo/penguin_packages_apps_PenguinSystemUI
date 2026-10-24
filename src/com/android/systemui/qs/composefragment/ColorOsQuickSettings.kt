@@ -12,8 +12,10 @@ import android.content.IntentFilter
 import android.media.AudioManager
 import android.service.quicksettings.Tile
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -45,6 +47,7 @@ import androidx.compose.material3.Icon as MaterialIcon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +59,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -226,6 +230,15 @@ private fun ColorOsCircle(
     val fill by animateFloatAsState(if (active) 1f else 0f, tween(200, easing = ColorOsEase))
     val iconColor by
         animateColorAsState(if (active) activeTint else Color.White, tween(200, easing = ColorOsEase))
+    // Tiles ColorOS has no animation for give a little bounce instead.
+    val pop = remember { Animatable(1f) }
+    var popped by remember { mutableStateOf(active) }
+    LaunchedEffect(active) {
+        if (popped == active) return@LaunchedEffect
+        popped = active
+        pop.snapTo(0.8f)
+        pop.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = 500f))
+    }
     Box(
         modifier =
             Modifier.size(size).cosGlass(CircleShape, active).drawBehind {
@@ -234,7 +247,9 @@ private fun ColorOsCircle(
         contentAlignment = Alignment.Center,
     ) {
         if (!cosTileLottie(spec, active, Color.White, activeTint, size * 0.42f)) {
-            SmallTileContent(iconProvider = { icon }, color = iconColor, size = { size * 0.42f })
+            Box(Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }) {
+                SmallTileContent(iconProvider = { icon }, color = iconColor, size = { size * 0.42f })
+            }
         }
     }
 }
