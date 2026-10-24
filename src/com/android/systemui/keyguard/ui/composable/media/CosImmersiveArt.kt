@@ -85,7 +85,9 @@ internal fun CosImmersiveArt(artwork: CommonIcon, video: File?, modifier: Modifi
         val height = maxHeight
         val base: @Composable (Modifier, File?) -> Unit = { layer, motion ->
             Box(layer.fillMaxSize()) {
-                ArtStack(artwork, motion, width, height * 0.2f)
+                // Wide (tablet landscape) screens fit the square to the height.
+                if (width > height) ArtStack(artwork, motion, height, 0.dp)
+                else ArtStack(artwork, motion, width, height * 0.2f)
                 Box(Modifier.fillMaxSize().background(maskColor.copy(alpha = MASK_ALPHA)))
             }
         }
@@ -170,7 +172,7 @@ private fun DrawScope.drawGlass(region: GlassBackdrop.Region, at: Offset, rim: R
 
 @Composable
 private fun ArtStack(artwork: CommonIcon, video: File?, side: Dp, top: Dp) {
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Artwork(artwork, Modifier.offset(y = top - side).size(side).graphicsLayer { scaleY = -1f })
         Box(Modifier.offset(y = top).size(side)) {
             Artwork(artwork, Modifier.fillMaxSize())
