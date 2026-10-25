@@ -54,6 +54,20 @@ internal object CosTileLottie {
             else -> null
         }
 
+    /** A ColorOS animation from the assets, by its path under cos/. */
+    suspend fun asset(context: Context, path: String): LottieComposition? =
+        compositions
+            .getOrPut(path) {
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        val json =
+                            context.assets.open("cos/$path").bufferedReader().use { it.readText() }
+                        LottieCompositionFactory.fromJsonStringSync(json, path).value!!
+                    }
+                }
+            }
+            .getOrNull()
+
     /** Whether the tile's own icon says more than ColorOS's, as signal bars do. */
     fun keepsOwnIcon(spec: String) = spec == "wifi" || spec == "internet" || spec == "cell"
 
@@ -90,6 +104,7 @@ internal fun cosTileLottie(
     offColor: Color,
     onColor: Color,
     size: Dp,
+    current: Color? = null,
 ): Boolean {
     if (spec == null) return false
     val context = LocalContext.current
@@ -119,7 +134,10 @@ internal fun cosTileLottie(
     val composition = shown ?: return false
     if (!playing && CosTileLottie.keepsOwnIcon(spec)) return false
     // ColorOS colours its icons in two layers, one shown at the start and one at the end.
-    val start = if (playing) (if (active) offColor else onColor) else offColor
+    // The start layer follows [current] while playing, so the icon never matches the circle
+    // filling in behind it.
+    val start =
+        if (playing) current ?: (if (active) offColor else onColor) else offColor
     val end = if (playing) (if (active) onColor else offColor) else onColor
     val properties =
         rememberLottieDynamicProperties(

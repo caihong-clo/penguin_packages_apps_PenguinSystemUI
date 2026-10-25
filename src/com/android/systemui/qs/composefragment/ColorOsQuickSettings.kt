@@ -79,6 +79,16 @@ import com.android.systemui.res.R
 import com.penguin.systemui.R as PenguinR
 import com.android.systemui.shade.ui.composable.CosTileTips
 import com.android.systemui.shade.ui.composable.cosSwitchRow
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.toArgb
+import com.airbnb.lottie.LottieComposition
+import com.airbnb.lottie.LottieProperty
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.rememberLottieDynamicProperties
+import com.airbnb.lottie.compose.rememberLottieDynamicProperty
+import androidx.compose.foundation.interaction.InteractionSource
 
 internal val ColorOsGap = 18.dp
 private val ColorOsPillHeight = 68.dp
@@ -183,11 +193,16 @@ fun ColorOsTopRows(
 private fun ColorOsConnectionPill(tile: TileViewModel) {
     val (uiState, icon) = rememberTileState(tile)
     val active = uiState.visualState == Tile.STATE_ACTIVE
+    val interaction = remember { MutableInteractionSource() }
     Row(
         modifier =
             Modifier.fillMaxSize()
+                .cosPress(interaction)
                 .cosGlass(ColorOsPill)
+                .cosSpotLight(ColorOsPill, CosSpotLightMedium)
                 .combinedClickable(
+                    interactionSource = interaction,
+                    indication = null,
                     onClick = { tile.primaryAction(uiState) },
                     onLongClick = { tile.settingsClick(null) },
                 )
@@ -225,6 +240,7 @@ private fun ColorOsCircle(
     size: Dp,
     activeTint: Color,
     spec: String? = null,
+    interaction: InteractionSource? = null,
 ) {
     // ColorOS fills the circle and recolours the icon over 200 ms.
     val fill by animateFloatAsState(if (active) 1f else 0f, tween(200, easing = ColorOsEase))
@@ -241,12 +257,14 @@ private fun ColorOsCircle(
     }
     Box(
         modifier =
-            Modifier.size(size).cosGlass(CircleShape, active).drawBehind {
-                if (fill > 0f) drawCircle(ColorOsActiveFill, alpha = fill)
-            },
+            Modifier.size(size)
+                .then(if (interaction != null) Modifier.cosPress(interaction) else Modifier)
+                .cosGlass(CircleShape, active)
+                .drawBehind { if (fill > 0f) drawCircle(ColorOsActiveFill, alpha = fill) }
+                .then(if (interaction != null) Modifier.cosSpotLight(CircleShape) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        if (!cosTileLottie(spec, active, Color.White, activeTint, size * 0.42f)) {
+        if (!cosTileLottie(spec, active, Color.White, activeTint, size * 0.42f, iconColor)) {
             Box(Modifier.graphicsLayer { scaleX = pop.value; scaleY = pop.value }) {
                 SmallTileContent(iconProvider = { icon }, color = iconColor, size = { size * 0.42f })
             }
@@ -256,33 +274,49 @@ private fun ColorOsCircle(
 
 private val ColorOsEase = CubicBezierEasing(0.33f, 0f, 0.67f, 1f)
 
-@Composable
-private fun ColorOsVectorCircle(
-    vector: ImageVector,
-    selected: Boolean,
-    size: Dp,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier =
-            Modifier.size(size)
-                .clip(CircleShape)
-                .then(
-                    if (selected) Modifier.background(ColorOsActiveFill, CircleShape)
-                    else Modifier
-                )
-                .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        MaterialIcon(
-            imageVector = vector,
-            contentDescription = null,
-            tint = if (selected) ColorOsRed else ColorOsSubLabel,
-            modifier = Modifier.size(size * 0.46f),
-        )
+private class ColorOsRingerStage(val mode: Int, val icon: ImageVector, val animation: String)
+
+private val ColorOsRingerStages =
+    listOf(
+        ColorOsRingerStage(
+            AudioManager.RINGER_MODE_NORMAL,
+            Icons.Filled.Notifications,
+            "qs_three_stage_normal_open_lottie.json",
+        ),
+        ColorOsRingerStage(
+            AudioManager.RINGER_MODE_VIBRATE,
+            Icons.Filled.Vibration,
+            "qs_three_stage_vibrate_lottie.json",
+        ),
+        ColorOsRingerStage(
+            AudioManager.RINGER_MODE_SILENT,
+            Icons.Filled.NotificationsOff,
+            "qs_three_stage_silent_open_lottie.json",
+        ),
+    )
+
+private val ColorOsRingerIndicator = 46.dp
+private val ColorOsRingerIcon = 22.dp
+
+/**
+ * Which way ColorOS nudges a ringer icon, by a tenth of a segment, for the stage selected: all
+ * right for the first, all left for the last, and apart around the middle one.
+ */
+private fun colorOsRingerNudge(index: Int, selected: Int): Float {
+    val last = ColorOsRingerStages.lastIndex
+    return when (selected) {
+        0 -> 1f
+        last -> -1f
+        else ->
+            when (index) {
+                0 -> 1f
+                last -> -1f
+                else -> 0f
+            }
     }
 }
 
+/** ColorOS's three-stage ringer: one indicator slides between ring, vibrate and silent. */
 @Composable
 private fun ColorOsRingerPill(modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -306,19 +340,109 @@ private fun ColorOsRingerPill(modifier: Modifier = Modifier) {
         audio.ringerModeInternal = value
         mode = value
     }
-    Row(
+    val selected = ColorOsRingerStages.indexOfFirst { it.mode == mode }.coerceAtLeast(0)
+    BoxWithConstraints(
         modifier = modifier.cosGlass(ColorOsPill).padding(horizontal = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+        contentAlignment = Alignment.CenterStart,
     ) {
-        ColorOsVectorCircle(Icons.Filled.Notifications, mode == AudioManager.RINGER_MODE_NORMAL, 46.dp) {
-            set(AudioManager.RINGER_MODE_NORMAL)
+        val density = LocalDensity.current
+        val segmentPx = with(density) { maxWidth.toPx() } / ColorOsRingerStages.size
+        val indicatorPx = with(density) { ColorOsRingerIndicator.toPx() }
+        val nudge = { index: Int -> colorOsRingerNudge(index, selected) * 0.1f * segmentPx }
+        val indicatorX by
+            animateFloatAsState(
+                selected * segmentPx + (segmentPx - indicatorPx) / 2 + nudge(selected),
+                cosSpring(0.25f, 0.3f),
+                label = "ringerIndicator",
+            )
+        Box(
+            Modifier.graphicsLayer { translationX = indicatorX }
+                .size(ColorOsRingerIndicator)
+                .background(ColorOsActiveFill, CircleShape)
+        )
+        Row(Modifier.fillMaxSize()) {
+            ColorOsRingerStages.forEachIndexed { index, stage ->
+                val shift by
+                    animateFloatAsState(nudge(index), cosSpring(0f, 0.35f), label = "ringerNudge")
+                ColorOsRingerButton(
+                    stage = stage,
+                    selected = index == selected,
+                    modifier =
+                        Modifier.weight(1f).fillMaxHeight().graphicsLayer { translationX = shift },
+                ) {
+                    set(stage.mode)
+                }
+            }
         }
-        ColorOsVectorCircle(Icons.Filled.Vibration, mode == AudioManager.RINGER_MODE_VIBRATE, 46.dp) {
-            set(AudioManager.RINGER_MODE_VIBRATE)
+    }
+}
+
+/** One ringer stage: grows and recolours when picked, and plays ColorOS's animation for it. */
+@Composable
+private fun ColorOsRingerButton(
+    stage: ColorOsRingerStage,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val context = LocalContext.current
+    val interaction = remember { MutableInteractionSource() }
+    val scale by
+        animateFloatAsState(if (selected) 1.2f else 1f, cosSpring(0f, 0.25f), label = "ringerScale")
+    val color by
+        animateColorAsState(
+            if (selected) ColorOsRed else ColorOsSubLabel,
+            cosSpring(0f, 0.3f),
+            label = "ringerColor",
+        )
+    var animation by remember { mutableStateOf<LottieComposition?>(null) }
+    // At rest each stage shows the last frame of its animation.
+    val progress = remember { Animatable(1f) }
+    var wasSelected by remember { mutableStateOf(selected) }
+    LaunchedEffect(Unit) { animation = CosTileLottie.asset(context, "ringermode/${stage.animation}") }
+    LaunchedEffect(selected, animation) {
+        val clip = animation ?: return@LaunchedEffect
+        if (selected == wasSelected) return@LaunchedEffect
+        wasSelected = selected
+        if (!selected) {
+            progress.snapTo(1f)
+            return@LaunchedEffect
         }
-        ColorOsVectorCircle(Icons.Filled.NotificationsOff, mode == AudioManager.RINGER_MODE_SILENT, 46.dp) {
-            set(AudioManager.RINGER_MODE_SILENT)
+        progress.snapTo(0f)
+        progress.animateTo(1f, tween(clip.duration.toInt(), easing = LinearEasing))
+    }
+    Box(
+        modifier =
+            modifier
+                .cosPress(interaction, press = cosSpring(0.18f, 0.13f), release = cosSpring(0.62f, 0.35f))
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        val iconModifier =
+            Modifier.size(ColorOsRingerIcon).graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+        val clip = animation
+        if (clip != null) {
+            val properties =
+                rememberLottieDynamicProperties(
+                    rememberLottieDynamicProperty(LottieProperty.COLOR, color.toArgb(), "**"),
+                    rememberLottieDynamicProperty(LottieProperty.STROKE_COLOR, color.toArgb(), "**"),
+                )
+            LottieAnimation(
+                composition = clip,
+                progress = { progress.value },
+                dynamicProperties = properties,
+                modifier = iconModifier,
+            )
+        } else {
+            MaterialIcon(
+                imageVector = stage.icon,
+                contentDescription = null,
+                tint = color,
+                modifier = iconModifier,
+            )
         }
     }
 }
@@ -404,12 +528,15 @@ private fun ColorOsTile(tile: TileViewModel, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val active = uiState.visualState == Tile.STATE_ACTIVE
     val unavailable = uiState.visualState == Tile.STATE_UNAVAILABLE
+    val interaction = remember { MutableInteractionSource() }
     Column(
         modifier =
             modifier
                 .fillMaxHeight()
                 .alpha(if (unavailable) 0.45f else 1f)
                 .combinedClickable(
+                    interactionSource = interaction,
+                    indication = null,
                     onClick = {
                         if (!unavailable) {
                             CosTileTips.show(
@@ -426,7 +553,14 @@ private fun ColorOsTile(tile: TileViewModel, modifier: Modifier = Modifier) {
                 ),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ColorOsCircle(icon, active, ColorOsTileSize, colorOsActiveTint(tile.spec.spec), tile.spec.spec)
+        ColorOsCircle(
+            icon,
+            active,
+            ColorOsTileSize,
+            colorOsActiveTint(tile.spec.spec),
+            tile.spec.spec,
+            interaction,
+        )
         Text(
             text = uiState.label,
             color = ColorOsLabel,
