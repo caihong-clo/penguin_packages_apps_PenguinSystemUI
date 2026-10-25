@@ -148,13 +148,18 @@ internal class QsHostTransition(val idle: Boolean, val leaving: Boolean)
 
 internal val LocalQsHostTransition = compositionLocalOf<QsHostTransition?> { null }
 
+@Composable
 internal fun ContentScope.qsHostTransition(): QsHostTransition {
+    val isLargeScreen = LocalConfiguration.current.smallestScreenWidthDp >= 600
     val transition = layoutState.transitionState as? TransitionState.Transition
     return QsHostTransition(
         idle = transition == null,
-        // The COS switch slides Quick Settings aside whole instead of folding it away.
+        // On tablets the scene moves/fades the whole COS panel with the finger. A separate
+        // timed hide on each module makes a slow drag disappear long before it reaches home.
+        // Keep the existing per-module exit behavior on phones.
         leaving =
-            transition != null &&
+            !isLargeScreen &&
+                transition != null &&
                 transition.key != CosShadeSwitch &&
                 transition.fromContent == contentKey &&
                 transition.toContent != contentKey,
