@@ -23,22 +23,38 @@ fun cosSpring(response: Double, durationScale: Double): SpringSpec<Float> =
         visibilityThreshold = Spring.DefaultDisplacementThreshold,
     )
 
-fun TransitionBuilder.cosToQuickSettingsShadeTransition(durationScale: Double = 1.0) {
+fun TransitionBuilder.cosToQuickSettingsShadeTransition(
+    durationScale: Double = 1.0,
+    isLargeScreen: Boolean = false,
+) {
     spec = cosSpring(COS_PANEL_RESPONSE, durationScale)
 
     fractionRange(end = .86f) { translate(QuickSettingsShade.Elements.Panel, y = -CosPanelDrop) }
-    fractionRange(end = .33f) { fade(OverlayShade.Elements.Scrim) }
+    fractionRange(end = .33f) {
+        fade(OverlayShade.Elements.Scrim)
+        if (isLargeScreen) fade(QuickSettingsShade.Elements.Panel)
+    }
+    if (isLargeScreen) {
+        scaleDraw(QuickSettingsShade.Elements.Panel, scaleX = .94f, scaleY = .94f)
+    }
     fractionRange(start = .5f) {
         fade(QuickSettingsShade.Elements.StatusBar)
         fade(QuickSettingsShade.Elements.Header)
     }
 }
 
-fun TransitionBuilder.cosFromQuickSettingsShadeTransition(durationScale: Double = 1.0) {
+fun TransitionBuilder.cosFromQuickSettingsShadeTransition(
+    durationScale: Double = 1.0,
+    isLargeScreen: Boolean = false,
+) {
     spec = cosSpring(COS_PANEL_RESPONSE, durationScale)
 
     translate(QuickSettingsShade.Elements.Panel, y = -CosPanelDrop)
+    if (isLargeScreen) {
+        scaleDraw(QuickSettingsShade.Elements.Panel, scaleX = .94f, scaleY = .94f)
+    }
     fractionRange(end = .5f) {
+        if (isLargeScreen) fade(QuickSettingsShade.Elements.Panel)
         fade(QuickSettingsShade.Elements.StatusBar)
         fade(QuickSettingsShade.Elements.Header)
     }
