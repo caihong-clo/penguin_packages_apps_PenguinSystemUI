@@ -18,6 +18,7 @@ package com.android.systemui.qs.ui.composable
 
 import androidx.compose.animation.core.Animatable
 import com.android.systemui.penguin.CosFeature
+import com.android.systemui.penguin.CosShadeSwitch
 import com.android.systemui.penguin.rememberCosFeature
 import com.android.systemui.qs.shared.style.LocalGlassBlurAlpha
 import com.android.systemui.qs.shared.style.panelStyle
@@ -151,8 +152,10 @@ internal fun ContentScope.qsHostTransition(): QsHostTransition {
     val transition = layoutState.transitionState as? TransitionState.Transition
     return QsHostTransition(
         idle = transition == null,
+        // The COS switch slides Quick Settings aside whole instead of folding it away.
         leaving =
             transition != null &&
+                transition.key != CosShadeSwitch &&
                 transition.fromContent == contentKey &&
                 transition.toContent != contentKey,
     )
