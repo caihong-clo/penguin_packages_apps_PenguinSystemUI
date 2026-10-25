@@ -7,6 +7,7 @@ package com.penguin.systemui.qs
 
 import androidx.compose.foundation.OverscrollFactory
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalConfiguration
 import com.android.compose.animation.scene.SceneTransitionsBuilder
 import com.android.compose.animation.scene.TransitionBuilder
 import com.android.compose.gesture.effect.rememberControlCentreOverscrollEffectFactory
@@ -32,12 +33,14 @@ import javax.inject.Inject
 class PenguinShadeMotion @Inject constructor() : ShadeMotion {
     private var defaultQsStyle = false
     private var cos = false
+    private var isLargeScreen = false
 
     @Composable
     override fun key(): Any? {
         defaultQsStyle = effectiveQsPanelStyle().stockLayout
         cos = rememberCosFeature(CosFeature.Shade)
-        return defaultQsStyle to cos
+        isLargeScreen = LocalConfiguration.current.smallestScreenWidthDp >= 600
+        return Triple(defaultQsStyle, cos, isLargeScreen)
     }
 
     override fun TransitionBuilder.shadeToQuickSettings(animateQsTilesAsShared: () -> Boolean) {
@@ -55,12 +58,12 @@ class PenguinShadeMotion @Inject constructor() : ShadeMotion {
     }
 
     override fun TransitionBuilder.toQuickSettingsShade(durationScale: Double) {
-        if (cos) cosToQuickSettingsShadeTransition(durationScale)
+        if (cos) cosToQuickSettingsShadeTransition(durationScale, isLargeScreen)
         else styledToQuickSettingsShadeTransition(durationScale = durationScale)
     }
 
     override fun TransitionBuilder.fromQuickSettingsShade() {
-        if (cos) cosFromQuickSettingsShadeTransition() else styledFromQuickSettingsShadeTransition()
+        if (cos) cosFromQuickSettingsShadeTransition(isLargeScreen = isLargeScreen) else styledFromQuickSettingsShadeTransition()
     }
 
     override fun TransitionBuilder.toNotificationsShade(
